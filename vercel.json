@@ -1,0 +1,11 @@
+{
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "vercel-node@2"
+    }
+  },
+  "routes": [
+    { "src": "/playlist/detail", "dest": "/api/playlist.js" },
+    { "src": "/song/url",      "dest": "/api/song.js" }
+  ]
+}
