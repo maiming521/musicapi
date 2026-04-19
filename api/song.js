@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 
 const cache = new Map();
@@ -17,11 +16,6 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { data } = await axios.get(
-            `https://music.163.com/song/media/outer/url?id=${id}.mp3`,
-            { timeout: 5000 }
-        );
-
         const result = {
             code: 200,
             data: [{
