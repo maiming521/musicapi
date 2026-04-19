@@ -1,14 +1,15 @@
 {
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "nodejs20.x"
-    }
-  },
-  "routes": [
-    { "src": "/playlist/detail", "dest": "/api/playlist.js" },
-    { "src": "/song/url", "dest": "/api/song.js" }
-  ],
+  "runtime": "nodejs20.x",
   "installCommand": "npm install axios",
   "outputDirectory": ".",
-  "framework": null
+  "routes": [
+    {
+      "src": "/playlist/detail",
+      "dest": "/api/playlist.js"
+    },
+    {
+      "src": "/song/url",
+      "dest": "/api/song.js"
+    }
+  ]
 }
