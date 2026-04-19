@@ -2,13 +2,9 @@
   "installCommand": "npm install axios",
   "outputDirectory": ".",
   "routes": [
-    {
-      "src": "/playlist/detail",
-      "dest": "/api/playlist.js"
-    },
-    {
-      "src": "/song/url",
-      "dest": "/api/song.js"
-    }
+    { "src": "/playlist/detail", "dest": "/api/playlist.js" },
+    { "src": "/song/url",      "dest": "/api/song.js" },
+    { "src": "/song/lrc",      "dest": "/api/lrc.js" },
+    { "src": "/song/pic",      "dest": "/api/pic.js" }
   ]
 }
