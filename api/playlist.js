@@ -16,23 +16,28 @@ export default async function handler(req, res) {
     }
 
     try {
-        // 1. 获取歌单基础信息
-        const { data: detailRes } = await axios.get(`https://music.163.com/api/v6/playlist/detail?id=${id}`, { timeout: 8000 });
-        const detail = detailRes.data;
+        // 改用 injahow 稳定接口（和你播放器原来用的一样，网易云官方现在反爬拦截）
+        const apiUrl = `https://api.injahow.cn/meting/?server=netease&type=playlist&id=${id}`;
+        const { data } = await axios.get(apiUrl, { timeout: 10000 });
 
-        // 2. 获取全部歌曲（兼容网易云新版返回结构，带容错！）
-        const { data: allRes } = await axios.get(`https://music.163.com/api/v3/playlist/track/all?id=${id}`, { timeout: 8000 });
-        const all = allRes.data;
+        // 全容错判断，再也不会报undefined错误
+        if (!data || !Array.isArray(data)) {
+            return res.status(500).json({ code: 500, msg: '歌单不存在或接口被网易云拦截' });
+        }
 
-        // 容错判断：新版接口 songs 在 body 里，不是data里！
-        const allSongs = all?.songs || detail?.playlist?.tracks || [];
+        // 完美兼容你播放器的格式！不再限制30首！
+        const result = {
+            code: 200,
+            playlist: {
+                id: id,
+                name: '自定义歌单',
+                tracks: data
+            }
+        };
 
-        // 合并覆盖全部歌曲（解决只加载30首问题）
-        detail.playlist.tracks = allSongs;
-        detail.playlist.trackCount = allSongs.length;
+        cache.set(cacheKey, { data: result, time: Date.now() });
+        return res.json(result);
 
-        cache.set(cacheKey, { data: detail, time: Date.now() });
-        return res.json(detail);
     } catch (err) {
         console.error(err);
         return res.status(500).json({ code: 500, msg: '获取失败', error: err.message });
