@@ -1,5 +1,4 @@
 {
-  "runtime": "nodejs20.x",
   "installCommand": "npm install axios",
   "outputDirectory": ".",
   "routes": [
@@ -11,5 +10,10 @@
       "src": "/song/url",
       "dest": "/api/song.js"
     }
-  ]
+  ],
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "nodejs20.x"
+    }
+  }
 }
