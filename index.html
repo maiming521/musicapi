@@ -3,68 +3,52 @@
  <head>
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width,initial-scale=1.0">
- <title>极简音乐播放器</title>
+ <title>音乐工具</title>
  <style>
  *{margin:0;padding:0;box-sizing:border-box;}
- body{background:#f5f5f5;padding:30px;}
- .box{max-width:500px;margin:0 auto;background:#fff;padding:25px;border-radius:12px;box-shadow:0 0 10px #00000012;}
- h2{text-align:center;margin-bottom:20px;color:#333;}
- .input-item{margin-bottom:15px;}
- input{width:100%;padding:12px 15px;border:1px solid #eee;border-radius:8px;font-size:14px;}
- button{width:100%;padding:12px;background:#2d81ff;color:#fff;border:none;border-radius:8px;font-size:15px;cursor:pointer;}
- #lrc{margin-top:20px;padding:15px;background:#f9f9f9;border-radius:8px;line-height:1.8;font-size:14px;color:#666;white-space:pre-wrap;max-height:300px;overflow:auto;}
- .loading{color:#999;text-align:center;margin:15px 0;}
+ body{background:#f5f7fa;padding:20px;}
+ .box{max-width:600px;margin:0 auto;background:#fff;border-radius:16px;padding:24px;}
+ h2{text-align:center;margin-bottom:20px;}
+ .inp{display:flex;gap:10px;margin-bottom:15px;}
+ input{flex:1;padding:12px;border:1px solid #eee;border-radius:8px;}
+ button{padding:12px 18px;background:#2d81ff;color:#fff;border:none;border-radius:8px;}
+ .list{border:1px solid #eee;border-radius:8px;max-height:280px;overflow:auto;}
+ .item{padding:12px;border-bottom:1px solid #f5f5f5;cursor:pointer;}
+ .item:active{background:#f0f7ff;}
+ .lrc{margin-top:20px;padding:15px;background:#f9f9f9;border-radius:8px;white-space:pre-wrap;line-height:1.8;}
  </style>
  </head>
  <body>
  <div class="box">
-   <h2>极简音乐播放</h2>
-   <div class="input-item">
-     <input type="text" id="sid" placeholder="输入网易云歌曲ID" value="30352891">
+   <h2>网易云简易工具</h2>
+   <div class="inp">
+     <input id="gid" placeholder="输入歌单ID" value="2161693544">
+     <button onclick="loadGd()">加载歌单</button>
    </div>
-   <button onclick="playMusic()">开始播放</button>
-   <div class="loading" id="load"></div>
-   <audio id="audio" controls style="width:100%;margin-top:15px;">
-   <div id="lrc"></div>
+   <div class="list" id="list"></div>
+   <div class="lrc" id="lrc">点击上方歌曲查看歌词</div>
  </div>
  <script>
- // 你的 Vercel 域名
- const apiOrigin = window.location.origin;
- // 播放音乐
- async function playMusic(){
-   const id = document.getElementById('sid').value.trim();
-   if(!id) return alert('请输入歌曲ID');
-   const load = document.getElementById('load');
-   const lrcDom = document.getElementById('lrc');
-   const audio = document.getElementById('audio');
-   load.innerText = "加载中...";
-   lrcDom.innerText = "";
-   audio.src = "";
-   try{
-     // 获取播放地址
-     const urlRes = await fetch(`${apiOrigin}/song/url?id=${id}`);
-     const urlData = await urlRes.json();
-     
-     // 获取歌词
-     const lrcRes = await fetch(`${apiOrigin}/lyric?id=${id}`);
-     const lrcData = await lrcRes.json();
-     if(urlData.data && urlData.data[0]?.url){
-       audio.src = urlData.data[0].url;
-       audio.play();
-       load.innerText = "播放成功";
-     }else{
-       load.innerText = "暂无播放资源/版权限制";
-     }
-     // 展示歌词
-     if(lrcData.lrc?.lyric){
-       lrcDom.innerText = lrcData.lrc.lyric;
-     }else{
-       lrcDom.innerText = "暂无歌词";
-     }
-   }catch(err){
-     load.innerText = "请求异常";
-     console.log(err);
-   }
+ const api = location.origin;
+ // 加载歌单
+ async function loadGd(){
+   let id = document.getElementById('gid').value;
+   let res = await fetch(api + '/playlist/detail?id=' + id);
+   let data = await res.json();
+   let html = '';
+   data.playlist.tracks.forEach(v=>{
+     html += `<div class="item" onclick="getInfo(${v.id})">${v.name} - ${v.ar[0].name}</div>`;
+   })
+   document.getElementById('list').innerHTML = html;
+ }
+ // 歌曲详情 + 歌词
+ async function getInfo(sid){
+   let info = await fetch(api + '/song/detail?id=' + sid).then(r=>r.json());
+   let lrc = await fetch(api + '/lyric?id=' + sid).then(r=>r.json());
+   let str = `歌名：${info.songs[0].name}
+ 歌手：${info.songs[0].ar[0].name}
+ ${lrc.lrc?.lyric || '暂无歌词'}`;
+   document.getElementById('lrc').innerText = str;
  }
  </script>
  </body>
