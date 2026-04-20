@@ -3,66 +3,68 @@
  <head>
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width,initial-scale=1.0">
- <title>音乐播放器</title>
+ <title>极简音乐播放器</title>
  <style>
  *{margin:0;padding:0;box-sizing:border-box;}
- body{background:#f5f7fa;padding:20px;}
- .container{max-width:600px;margin:0 auto;background:#fff;border-radius:16px;padding:24px;box-shadow:0 4px 12px rgba(0,0,0,0.08);}
- h2{text-align:center;color:#222;margin-bottom:24px;}
- .input-box{display:flex;gap:10px;margin-bottom:20px;}
- input{flex:1;padding:12px 16px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;}
- button{padding:12px 20px;background:#1677ff;color:#fff;border:none;border-radius:8px;cursor:pointer;}
- .list-title{font-size:16px;margin:15px 0 10px;color:#333;}
- #list{max-height:260px;overflow:auto;border:1px solid #eee;border-radius:8px;}
- .item{padding:10px 15px;border-bottom:1px solid #f5f5f5;cursor:pointer;}
- .item:hover{background:#f9fafc;}
- .lrc{margin-top:20px;padding:16px;background:#f9fafc;border-radius:8px;white-space:pre-wrap;line-height:1.8;color:#555;max-height:300px;overflow:auto;}
- .tips{color:#999;font-size:13px;margin:10px 0;}
+ body{background:#f5f5f5;padding:30px;}
+ .box{max-width:500px;margin:0 auto;background:#fff;padding:25px;border-radius:12px;box-shadow:0 0 10px #00000012;}
+ h2{text-align:center;margin-bottom:20px;color:#333;}
+ .input-item{margin-bottom:15px;}
+ input{width:100%;padding:12px 15px;border:1px solid #eee;border-radius:8px;font-size:14px;}
+ button{width:100%;padding:12px;background:#2d81ff;color:#fff;border:none;border-radius:8px;font-size:15px;cursor:pointer;}
+ #lrc{margin-top:20px;padding:15px;background:#f9f9f9;border-radius:8px;line-height:1.8;font-size:14px;color:#666;white-space:pre-wrap;max-height:300px;overflow:auto;}
+ .loading{color:#999;text-align:center;margin:15px 0;}
  </style>
  </head>
  <body>
- <div class="container">
-   <h2>简易音乐工具</h2>
-   <div class="input-box">
-     <input type="text" id="pid" placeholder="输入歌单ID" value="2161693544">
-     <button onclick="getPlaylist()">加载歌单</button>
+ <div class="box">
+   <h2>极简音乐播放</h2>
+   <div class="input-item">
+     <input type="text" id="sid" placeholder="输入网易云歌曲ID" value="30352891">
    </div>
-   <div class="tips">提示：点击列表歌曲，查看详情与歌词</div>
-   <div class="list-title">歌单列表</div>
-   <div id="list"></div>
-   <div class="lrc" id="lrc">选择一首歌，展示歌词</div>
+   <button onclick="playMusic()">开始播放</button>
+   <div class="loading" id="load"></div>
+   <audio id="audio" controls style="width:100%;margin-top:15px;">
+   <div id="lrc"></div>
  </div>
  <script>
- const api = location.origin;
- // 加载歌单
- async function getPlaylist(){
-   let pid = document.getElementById('pid').value;
-   let res = await fetch(`${api}/playlist/detail?id=${pid}`);
-   let data = await res.json();
-   let listDom = document.getElementById('list');
-   listDom.innerHTML = '';
-   data.playlist.tracks.forEach(item=>{
-     let div = document.createElement('div');
-     div.className = 'item';
-     div.innerText = item.name + ' - ' + item.ar[0].name;
-     div.onclick = ()=> getSongInfo(item.id);
-     listDom.appendChild(div);
-   })
- }
- // 获取歌曲详情 + 歌词
- async function getSongInfo(sid){
-   // 歌曲详情
-   let infoRes = await fetch(`${api}/song/detail?id=${sid}`);
-   let info = await infoRes.json();
-   // 歌词
-   let lrcRes = await fetch(`${api}/song/lrc?id=${sid}`);
-   let lrc = await lrcRes.json();
-   // 渲染
-   let lrcDom = document.getElementById('lrc');
-   let name = info.songs[0].name;
-   let singer = info.songs[0].ar[0].name;
-   let lrcText = lrc.lrc ? lrc.lrc.lyric : '暂无歌词';
-   lrcDom.innerText = `歌曲：${name}\n歌手：${singer}\n\n${lrcText}`;
+ // 你的 Vercel 域名
+ const apiOrigin = window.location.origin;
+ // 播放音乐
+ async function playMusic(){
+   const id = document.getElementById('sid').value.trim();
+   if(!id) return alert('请输入歌曲ID');
+   const load = document.getElementById('load');
+   const lrcDom = document.getElementById('lrc');
+   const audio = document.getElementById('audio');
+   load.innerText = "加载中...";
+   lrcDom.innerText = "";
+   audio.src = "";
+   try{
+     // 获取播放地址
+     const urlRes = await fetch(`${apiOrigin}/song/url?id=${id}`);
+     const urlData = await urlRes.json();
+     
+     // 获取歌词
+     const lrcRes = await fetch(`${apiOrigin}/lyric?id=${id}`);
+     const lrcData = await lrcRes.json();
+     if(urlData.data && urlData.data[0]?.url){
+       audio.src = urlData.data[0].url;
+       audio.play();
+       load.innerText = "播放成功";
+     }else{
+       load.innerText = "暂无播放资源/版权限制";
+     }
+     // 展示歌词
+     if(lrcData.lrc?.lyric){
+       lrcDom.innerText = lrcData.lrc.lyric;
+     }else{
+       lrcDom.innerText = "暂无歌词";
+     }
+   }catch(err){
+     load.innerText = "请求异常";
+     console.log(err);
+   }
  }
  </script>
  </body>
