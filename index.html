@@ -93,25 +93,18 @@
     </div>
 </div>
 
-<audio id="audio">
+<audio id="audio"></audio>
 
 <script>
-    // ========== 配置 ==========
-    const API_BASE = 'https://api.567.one';          // 你的 API 域名
-    const DEFAULT_PLAYLIST_ID = '5185298264';       // 默认歌单ID
-
-    // 获取歌曲播放地址
-    function getSongUrl(songId) {
-        return `https://api.injahow.cn/meting/?server=netease&type=song&id=${songId}`;
-    }
+    // ========== 稳定公开API配置 ==========
+    const API = "https://api.injahow.cn/meting/";
 
     // ========== 全局变量 ==========
-    let currentPlaylist = [];      // 歌曲列表 [{ id, name, artist, cover }]
+    let currentPlaylist = [];
     let currentIndex = 0;
-    let isPlaying = false;
     const audio = document.getElementById('audio');
 
-    // DOM 元素
+    // DOM
     const playBtn = document.getElementById('playBtn');
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
@@ -130,206 +123,163 @@
     const recommendGrid = document.getElementById('recommendGrid');
     const refreshRecommendBtn = document.getElementById('refreshRecommend');
 
-    // 辅助函数
+    // 工具
     function formatTime(sec) {
         if (isNaN(sec)) return '0:00';
-        const mins = Math.floor(sec / 60);
-        const remain = Math.floor(sec % 60);
-        return `${mins}:${remain < 10 ? '0' : ''}${remain}`;
+        const m = Math.floor(sec / 60);
+        const s = Math.floor(sec % 60);
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
     }
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m] || m));
+    function escapeHtml(s) {
+        if (!s) return '';
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
-    // 获取歌曲详情（封面、歌手）
-    async function getSongDetail(songId) {
-        const url = `${API_BASE}/song/detail?ids=${songId}`;
+    // ========== 核心：获取推荐歌单 ==========
+    async function getRecommend() {
         try {
-            const res = await fetch(url);
-            const data = await res.json();
-            if (data.code === 200 && data.songs && data.songs[0]) {
-                const s = data.songs[0];
-                return {
-                    id: s.id,
-                    name: s.name,
-                    artist: s.ar.map(a => a.name).join('/'),
-                    cover: s.al.picUrl
-                };
-            }
-        } catch (e) {}
-        return null;
+            const r = await fetch(`${API}?server=netease&type=playlist&id=2438439785`);
+            const data = await r.json();
+            return data.map(i => ({
+                id: i.id,
+                name: i.name,
+                artist: i.artist,
+                cover: i.pic,
+                url: i.url
+            }));
+        } catch (e) {
+            return [];
+        }
     }
 
-    // 加载歌单
-    async function loadPlaylist(playlistId) {
-        const url = `${API_BASE}/playlist/detail?id=${playlistId}`;
+    // ========== 搜索 ==========
+    async function search(key) {
         try {
-            const res = await fetch(url);
-            const data = await res.json();
-            if (data.code === 200 && data.playlist && data.playlist.tracks) {
-                return data.playlist.tracks.slice(0, 8).map(t => ({
-                    id: t.id,
-                    name: t.name,
-                    artist: t.ar.map(a => a.name).join('/'),
-                    cover: t.al.picUrl
-                }));
-            }
-        } catch (e) {}
-        return [];
+            const r = await fetch(`${API}?server=netease&type=search&count=20&keywords=${encodeURIComponent(key)}`);
+            const data = await r.json();
+            return data.map(i => ({
+                id: i.id,
+                name: i.name,
+                artist: i.artist,
+                cover: i.pic,
+                url: i.url
+            }));
+        } catch (e) {
+            return [];
+        }
     }
 
-    // 渲染推荐歌单
+    // ========== 渲染推荐 ==========
     async function renderRecommend() {
-        recommendGrid.innerHTML = '加载中...';
-        const songs = await loadPlaylist(DEFAULT_PLAYLIST_ID);
-        currentPlaylist = songs; // 推荐歌单直接作为全局播放列表
-        if (!songs.length) {
-            recommendGrid.innerHTML = '<div>暂无推荐，请稍后重试</div>';
+        recommendGrid.innerHTML = "加载中...";
+        const list = await getRecommend();
+        currentPlaylist = list;
+        if (!list.length) {
+            recommendGrid.innerHTML = "<div>加载失败</div>";
             return;
         }
-        recommendGrid.innerHTML = '';
-        songs.forEach((song,index) => {
-            const card = document.createElement('div');
-            card.className = 'rec-card';
-            card.innerHTML = `
-                <div class="rec-cover" style="background-image: url('${song.cover || 'https://picsum.photos/160/160'}');"></div>
+        recommendGrid.innerHTML = "";
+        list.forEach((song, idx) => {
+            const c = document.createElement("div");
+            c.className = "rec-card";
+            c.innerHTML = `
+                <div class="rec-cover" style="background-image:url('${song.cover}')"></div>
                 <div class="rec-title">${escapeHtml(song.name)}</div>
                 <div class="rec-artist">${escapeHtml(song.artist)}</div>
             `;
-            card.addEventListener('click', async () => {
-                currentIndex = index; // 点击哪首播放哪首
-                playCurrent();
-            });
-            recommendGrid.appendChild(card);
+            c.onclick = () => {
+                currentIndex = idx;
+                play();
+            };
+            recommendGrid.appendChild(c);
         });
     }
 
-    // 搜索
-    async function searchSongs(keyword) {
-        const url = `${API_BASE}/search?keywords=${encodeURIComponent(keyword)}&type=1`;
-        try {
-            const res = await fetch(url);
-            const data = await res.json();
-            if (data.code === 200 && data.result && data.result.songs) {
-                return data.result.songs.slice(0, 20).map(s => ({
-                    id: s.id,
-                    name: s.name,
-                    artist: s.artists.map(a => a.name).join('/'),
-                    cover: s.album.picUrl
-                }));
-            }
-        } catch (e) {}
-        return [];
+    // ========== 播放 ==========
+    function play() {
+        if (!currentPlaylist.length) return;
+        const song = currentPlaylist[currentIndex];
+        playerTitle.innerText = song.name;
+        playerArtist.innerText = song.artist;
+        playerCover.style.backgroundImage = `url(${song.cover})`;
+        audio.src = song.url;
+        audio.play();
+    }
+    function next() {
+        currentIndex = (currentIndex + 1) % currentPlaylist.length;
+        play();
+    }
+    function prev() {
+        currentIndex = (currentIndex - 1 + currentPlaylist.length) % currentPlaylist.length;
+        play();
     }
 
-    async function performSearch() {
-        const keyword = searchInput.value.trim();
-        if (!keyword) return;
-        searchResultsDiv.style.display = 'block';
-        resultsList.innerHTML = '搜索中...';
-        const results = await searchSongs(keyword);
-        if (!results.length) {
-            resultsList.innerHTML = '<div>未找到相关歌曲</div>';
+    // ========== 搜索执行 ==========
+    async function doSearch() {
+        const k = searchInput.value.trim();
+        if (!k) return;
+        searchResultsDiv.style.display = "block";
+        resultsList.innerHTML = "搜索中...";
+        const list = await search(k);
+        if (!list.length) {
+            resultsList.innerHTML = "<div>无结果</div>";
             return;
         }
-        resultsList.innerHTML = '';
-        results.forEach((song,index) => {
-            const item = document.createElement('div');
-            item.className = 'result-item';
+        currentPlaylist = list;
+        resultsList.innerHTML = "";
+        list.forEach((song, idx) => {
+            const item = document.createElement("div");
+            item.className = "result-item";
             item.innerHTML = `
-                <img class="result-cover" src="${song.cover || 'https://picsum.photos/48/48'}" onerror="this.src='https://picsum.photos/48/48'">
+                <img class="result-cover" src="${song.cover}">
                 <div class="result-info">
                     <div class="result-name">${escapeHtml(song.name)}</div>
                     <div class="result-artist">${escapeHtml(song.artist)}</div>
                 </div>
             `;
-            item.addEventListener('click', async () => {
-                currentPlaylist = results; // 搜索结果作为播放列表
-                currentIndex = index;
-                playCurrent();
-                searchResultsDiv.style.display = 'none';
-            });
+            item.onclick = () => {
+                currentIndex = idx;
+                play();
+                searchResultsDiv.style.display = "none";
+            };
             resultsList.appendChild(item);
         });
     }
 
-    // 播放当前歌曲（修复异步获取url错乱）
-    async function playCurrent() {
-        if (!currentPlaylist.length) return;
-        const song = currentPlaylist[currentIndex];
-        playerTitle.innerText = song.name;
-        playerArtist.innerText = song.artist;
-        playerCover.style.backgroundImage = `url(${song.cover || 'https://picsum.photos/56/56'})`;
-
-        try {
-            const res = await fetch(getSongUrl(song.id));
-            const data = await res.json();
-            if (data && data[0] && data[0].url) {
-                audio.src = data[0].url;
-                audio.load();
-                audio.play().catch(e => console.log('播放失败', e));
-            } else {
-                alert('暂无音源，无法播放');
-            }
-        } catch (err) {
-            console.error('获取音频链接失败', err);
-            alert('音源接口异常');
-        }
-    }
-
-    function nextTrack() {
-        if (!currentPlaylist.length) return;
-        currentIndex = (currentIndex + 1) % currentPlaylist.length;
-        playCurrent();
-    }
-    function prevTrack() {
-        if (!currentPlaylist.length) return;
-        currentIndex = (currentIndex - 1 + currentPlaylist.length) % currentPlaylist.length;
-        playCurrent();
-    }
+    // ========== 进度条 ==========
     function updateProgress() {
-        if (audio.duration) {
-            progressFill.style.width = (audio.currentTime / audio.duration) * 100 + '%';
-            currentTimeSpan.innerText = formatTime(audio.currentTime);
-            durationSpan.innerText = formatTime(audio.duration);
-        }
-    }
-    function updatePlayPauseIcon(playing) {
-        playBtn.innerHTML = playing ? '⏸' : '▶';
-        isPlaying = playing;
+        if (!audio.duration) return;
+        progressFill.style.width = (audio.currentTime / audio.duration) * 100 + "%";
+        currentTimeSpan.innerText = formatTime(audio.currentTime);
+        durationSpan.innerText = formatTime(audio.duration);
     }
 
-    // 事件绑定
-    function bindEvents() {
-        playBtn.addEventListener('click', () => {
-            if (audio.paused) {
-                audio.play();
-            } else audio.pause();
-        });
-        prevBtn.addEventListener('click', prevTrack);
-        nextBtn.addEventListener('click', nextTrack);
-        audio.addEventListener('play', () => updatePlayPauseIcon(true));
-        audio.addEventListener('pause', () => updatePlayPauseIcon(false));
-        audio.addEventListener('timeupdate', updateProgress);
-        audio.addEventListener('ended', nextTrack);
-        progressBar.addEventListener('click', (e) => {
-            const rect = progressBar.getBoundingClientRect();
-            const percent = (e.clientX - rect.left) / rect.width;
-            audio.currentTime = percent * audio.duration;
-        });
-        volumeSlider.addEventListener('input', (e) => audio.volume = parseFloat(e.target.value));
-        searchBtn.addEventListener('click', performSearch);
-        searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
-        refreshRecommendBtn.addEventListener('click', renderRecommend);
+    // ========== 事件 ==========
+    function bind() {
+        playBtn.onclick = () => audio.paused ? audio.play() : audio.pause();
+        prevBtn.onclick = prev;
+        nextBtn.onclick = next;
+        audio.ontimeupdate = updateProgress;
+        audio.onended = next;
+        audio.onplay = () => playBtn.innerHTML = "⏸";
+        audio.onpause = () => playBtn.innerHTML = "▶";
+        progressBar.onclick = e => {
+            const w = progressBar.clientWidth;
+            audio.currentTime = (e.offsetX / w) * audio.duration;
+        };
+        volumeSlider.oninput = () => audio.volume = volumeSlider.value;
+        searchBtn.onclick = doSearch;
+        searchInput.onkeydown = e => e.key === "Enter" && doSearch();
+        refreshRecommendBtn.onclick = renderRecommend;
     }
 
-    async function init() {
-        bindEvents();
+    // ========== 启动 ==========
+    async function start() {
+        bind();
         await renderRecommend();
-        audio.volume = volumeSlider.value;
+        audio.volume = 0.7;
     }
-    init();
+    start();
 </script>
 </body>
 </html>
