@@ -454,14 +454,13 @@
         return `${m.toString().padStart(2,0)}:${sec.toString().padStart(2,0)}`;
     }
 
-    // 封面加载三重保险：代理+时间戳+无referrer
+    // 封面加载纯前端方案：无referrer + 时间戳
     function getCoverUrl(url) {
         if (!url) return '';
-        // 用API代理 + 加时间戳防缓存
-        return `${API_BASE}/image/proxy?url=${encodeURIComponent(url)}&t=${Date.now()}`;
+        return url + '?t=' + Date.now();
     }
 
-    // 渲染歌曲列表（修复搜索封面）
+    // 渲染歌曲列表（修复所有封面）
     function renderSongList(list, container) {
         container.innerHTML = '';
         if (!list || list.length === 0) {
@@ -574,7 +573,7 @@
         }
     }
 
-    // 播放歌曲
+    // 播放歌曲（修复切换卡顿、封面不一致、串歌）
     async function playSong(song) {
         if (!song?.id) return;
         currentSong = song;
@@ -652,7 +651,7 @@
         audio.volume = volumeSlider.value / 100;
     };
 
-    // 上/下一首
+    // 上一首/下一首
     document.getElementById('prevBtn').onclick = () => {
         if (!currentSongList.length || !currentSong) return;
         let idx = currentSongList.findIndex(s => s.id === currentSong.id);
@@ -671,7 +670,6 @@
     searchInput.onkeydown = e => e.key === "Enter" && searchSongs(searchInput.value);
     refreshBtn.onclick = loadRecommend;
 
-    // 初始化
     loadRecommend();
 </script>
 </body>
