@@ -27,7 +27,7 @@
         @media (max-width: 600px) {
             body {
                 padding: 1rem;
-                padding-bottom: 220px;
+                padding-bottom: 180px;
             }
         }
 
@@ -294,7 +294,7 @@
             }
         }
 
-        /* 歌词容器 - 适配手机端 */
+        /* 桌面端歌词 */
         .lyrics-box {
             position: fixed;
             right: 2rem;
@@ -312,29 +312,37 @@
                 display: none;
             }
         }
-        /* 手机端歌词 */
+
+        /* 手机端歌词 - 调整到播放器右侧 */
         @media (max-width: 600px) {
             .lyrics-box-mobile {
                 display: block !important;
                 position: fixed;
-                bottom: 80px;
-                left: 0;
-                right: 0;
-                width: 100%;
-                height: 100px;
+                bottom: 120px;
+                right: 1rem;
+                width: 120px;
+                height: 80px;
                 background-color: rgba(18, 24, 38, 0.95);
-                border-radius: 0;
-                border-top: 1px solid #272e3b;
+                border-radius: 8px;
                 overflow-y: auto;
-                padding: 0.5rem 1rem;
+                padding: 0.3rem;
+                font-size: 0.8rem;
                 text-align: center;
+                border: 1px solid #272e3b;
             }
         }
+
         .lyrics-title {
             font-size: 1.2rem;
             margin-bottom: 1rem;
             color: #a8d1ff;
         }
+        @media (max-width: 600px) {
+            .lyrics-title {
+                display: none;
+            }
+        }
+
         .lyric-line {
             padding: 0.4rem 0;
             color: #94a3b8;
@@ -345,6 +353,15 @@
             font-size: 1.1rem;
             font-weight: 500;
         }
+        @media (max-width: 600px) {
+            .lyric-line {
+                padding: 0.2rem 0;
+            }
+            .lyric-line.active {
+                font-size: 0.9rem;
+            }
+        }
+
         .fav-btn {
             background: none;
             border: none;
@@ -388,7 +405,7 @@
     <div id="lyricsContent"></div>
 </div>
 
-<!-- 手机端歌词 -->
+<!-- 手机端歌词 - 放在播放器右侧 -->
 <div class="lyrics-box lyrics-box-mobile" id="lyricsBoxMobile" style="display: none;">
     <div id="lyricsContentMobile"></div>
 </div>
@@ -454,13 +471,18 @@
         return `${m.toString().padStart(2,0)}:${sec.toString().padStart(2,0)}`;
     }
 
-    // 封面加载纯前端方案：无referrer + 时间戳
+    // 封面加载终极方案：兼容所有字段 + 时间戳 + 无referrer
     function getCoverUrl(url) {
         if (!url) return '';
-        return url + '?t=' + Date.now();
+        // 处理不同格式的图片URL
+        if (url.startsWith('http://')) {
+            url = url.replace('http://', 'https://');
+        }
+        // 加时间戳防缓存
+        return url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
     }
 
-    // 渲染歌曲列表（修复所有封面）
+    // 渲染歌曲列表（修复搜索封面）
     function renderSongList(list, container) {
         container.innerHTML = '';
         if (!list || list.length === 0) {
@@ -491,7 +513,8 @@
                     } catch (e) {}
                 };
             } else {
-                cover = getCoverUrl(item.al?.picUrl || item.album?.picUrl || "");
+                // 兼容所有可能的封面字段
+                cover = getCoverUrl(item.al?.picUrl || item.album?.picUrl || item.album?.blurPicUrl || "");
                 name = item.name || "";
                 artist = (item.ar || item.artists || []).map(a => a.name).join('/');
                 card.onclick = () => {
@@ -501,8 +524,9 @@
             }
 
             card.innerHTML = `
-                <img class="song-cover" src="${cover}" alt="${name}" referrerpolicy="no-referrer"
-                     onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%2394a3b8%22%3E%3Cpath d=%22M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z%22/%3E%3C/svg%3E'">
+                <img class="song-cover" src="${cover}" alt="${name}" referrerpolicy="no-referrer" crossorigin="anonymous"
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <div style="display:none;width:100%;aspect-ratio:1/1;background:#272e3b;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#94a3b8;">♪</div>
                 <div class="song-name">${name}</div>
                 <div class="song-artist">${artist}</div>
             `;
@@ -569,11 +593,14 @@
         });
         if (activeLine) {
             activeLine.classList.add('active');
-            activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // 手机端歌词不需要滚动，桌面端才需要
+            if (!activeLine.closest('.lyrics-box-mobile')) {
+                activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
         }
     }
 
-    // 播放歌曲（修复切换卡顿、封面不一致、串歌）
+    // 播放歌曲
     async function playSong(song) {
         if (!song?.id) return;
         currentSong = song;
@@ -670,6 +697,7 @@
     searchInput.onkeydown = e => e.key === "Enter" && searchSongs(searchInput.value);
     refreshBtn.onclick = loadRecommend;
 
+    // 初始化
     loadRecommend();
 </script>
 </body>
