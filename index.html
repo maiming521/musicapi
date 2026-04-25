@@ -387,10 +387,10 @@
     </div>
 </div>
 
-<audio id="audio"></audio>
+<audio id="audio">
 
 <script>
-    const API_BASE = 'https://api1.567.one';
+    const API_BASE = 'https://api.567.one';
 
     let currentSong = null;
     let currentSongList = [];
@@ -420,7 +420,13 @@
         return `${m.toString().padStart(2,0)}:${sec.toString().padStart(2,0)}`;
     }
 
-    // 渲染歌曲列表（修复封面）
+    // 修复：统一取封面 + 加时间戳防缓存
+    function getCoverUrl(url) {
+        if (!url) return '';
+        return url + '?t=' + Date.now();
+    }
+
+    // 渲染歌曲列表（修复搜索封面、歌单点击）
     function renderSongList(list, container) {
         container.innerHTML = '';
         if (!list || list.length === 0) {
@@ -433,24 +439,32 @@
             
             let cover, name, artist;
             if (item.type === 'playlist') {
-                cover = item.picUrl || item.coverImgUrl || "";
+                cover = getCoverUrl(item.picUrl || item.coverImgUrl || "");
                 name = item.name || "";
                 artist = "推荐歌单";
                 card.onclick = async () => {
                     try {
-                        const res = await fetch(`${API_BASE}/playlist/detail?id=${item.id}`);
+                        // 清空旧列表，避免串歌
+                        currentSongList = [];
+                        currentSong = null;
+                        audio.src = '';
+                        // 加时间戳防缓存
+                        const res = await fetch(`${API_BASE}/playlist/detail?id=${item.id}&_t=${Date.now()}`);
                         const data = await res.json();
                         const songs = data.playlist?.tracks || [];
                         if (songs.length) {
                             currentSongList = songs;
-                            playSong(songs[0]);
+                            await playSong(songs[0]); // 等待第一首播完
                         }
-                    } catch (e) {}
+                    } catch (e) {
+                        console.error('歌单加载失败', e);
+                    }
                 };
             } else {
-                cover = item.al?.picUrl || "";
+                // 搜索结果兼容两种字段
+                cover = getCoverUrl(item.al?.picUrl || item.album?.picUrl || "");
                 name = item.name || "";
-                artist = (item.ar || []).map(a => a.name).join('/');
+                artist = (item.ar || item.artists || []).map(a => a.name).join('/');
                 card.onclick = () => {
                     currentSongList = list;
                     playSong(item);
@@ -467,38 +481,51 @@
         });
     }
 
-    // 播放歌曲（无弹窗）
+    // 播放歌曲（修复切换卡顿、封面不一致、串歌）
     async function playSong(song) {
         if (!song?.id) return;
+        // 强制清空旧状态，防止串歌
         currentSong = song;
+        audio.pause();
+        audio.src = '';
 
-        playerCover.src = song.al?.picUrl || "";
+        // 立即更新封面和信息，不等待接口
+        const cover = getCoverUrl(song.al?.picUrl || song.album?.picUrl || "");
+        playerCover.src = cover;
         playerName.textContent = song.name || "";
-        playerArtist.textContent = (song.ar || []).map(a => a.name).join('/');
+        playerArtist.textContent = (song.ar || song.artists || []).map(a => a.name).join('/');
+        playBtn.textContent = "▶";
 
         try {
-            const res = await fetch(`${API_BASE}/song/url?id=${song.id}`);
+            // 加时间戳防缓存
+            const res = await fetch(`${API_BASE}/song/url?id=${song.id}&br=320000&_t=${Date.now()}`);
             const data = await res.json();
             if (data.data?.[0]?.url) {
                 audio.src = data.data[0].url;
-                audio.play();
+                await audio.play();
                 playBtn.textContent = "⏸";
+            } else {
+                console.warn('无播放地址');
             }
-        } catch (e) {}
+        } catch (e) {
+            console.error('播放地址获取失败', e);
+        }
 
         try {
-            const lrcRes = await fetch(`${API_BASE}/lyric?id=${song.id}`);
+            const lrcRes = await fetch(`${API_BASE}/lyric?id=${song.id}&_t=${Date.now()}`);
             const lrcData = await lrcRes.json();
             lyricsContent.innerText = lrcData.lrc?.lyric || "[00:00.00]暂无歌词";
-        } catch (e) {}
+        } catch (e) {
+            lyricsContent.innerText = "[00:00.00]暂无歌词";
+        }
     }
 
-    // 搜索
+    // 搜索（修复封面）
     async function searchSongs(key) {
         if (!key.trim()) return;
         searchResult.innerHTML = "搜索中...";
         try {
-            const res = await fetch(`${API_BASE}/search?keywords=${encodeURIComponent(key)}&type=1`);
+            const res = await fetch(`${API_BASE}/search?keywords=${encodeURIComponent(key)}&type=1&_t=${Date.now()}`);
             const data = await res.json();
             renderSongList(data.result?.songs || [], searchResult);
         } catch (e) {
@@ -510,7 +537,7 @@
     async function loadRecommend() {
         recommendList.innerHTML = "加载中...";
         try {
-            const res = await fetch(`${API_BASE}/personalized?limit=12`);
+            const res = await fetch(`${API_BASE}/personalized?limit=12&_t=${Date.now()}`);
             const data = await res.json();
             const list = data.result || [];
             list.forEach(i => i.type = 'playlist');
@@ -541,6 +568,20 @@
 
     volumeSlider.oninput = () => {
         audio.volume = volumeSlider.value / 100;
+    };
+
+    // 上一首/下一首（简单顺序）
+    document.getElementById('prevBtn').onclick = () => {
+        if (!currentSongList.length || !currentSong) return;
+        let idx = currentSongList.findIndex(s => s.id === currentSong.id);
+        idx = idx <= 0 ? currentSongList.length - 1 : idx - 1;
+        playSong(currentSongList[idx]);
+    };
+    document.getElementById('nextBtn').onclick = () => {
+        if (!currentSongList.length || !currentSong) return;
+        let idx = currentSongList.findIndex(s => s.id === currentSong.id);
+        idx = idx >= currentSongList.length - 1 ? 0 : idx + 1;
+        playSong(currentSongList[idx]);
     };
 
     // 事件
