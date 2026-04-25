@@ -158,6 +158,7 @@
             padding: 1rem;
             cursor: pointer;
             transition: 0.3s;
+            overflow: hidden;
         }
         .song-cover {
             width: 100%;
@@ -166,6 +167,7 @@
             object-fit: cover;
             margin-bottom: 0.8rem;
             background-color: #272e3b;
+            display: block;
         }
         .song-name {
             font-size: 1rem;
@@ -313,22 +315,23 @@
             }
         }
 
-        /* 手机端歌词 - 调整到播放器右侧 */
+        /* 手机端歌词 - 调整到播放器右侧，不遮挡封面 */
         @media (max-width: 600px) {
             .lyrics-box-mobile {
                 display: block !important;
                 position: fixed;
-                bottom: 120px;
+                bottom: 100px;
                 right: 1rem;
-                width: 120px;
-                height: 80px;
+                width: 110px;
+                height: 70px;
                 background-color: rgba(18, 24, 38, 0.95);
                 border-radius: 8px;
                 overflow-y: auto;
-                padding: 0.3rem;
-                font-size: 0.8rem;
+                padding: 0.2rem;
+                font-size: 0.75rem;
                 text-align: center;
                 border: 1px solid #272e3b;
+                z-index: 999;
             }
         }
 
@@ -358,7 +361,7 @@
                 padding: 0.2rem 0;
             }
             .lyric-line.active {
-                font-size: 0.9rem;
+                font-size: 0.85rem;
             }
         }
 
@@ -471,18 +474,16 @@
         return `${m.toString().padStart(2,0)}:${sec.toString().padStart(2,0)}`;
     }
 
-    // 封面加载终极方案：兼容所有字段 + 时间戳 + 无referrer
+    // 封面加载方案：兼容所有字段 + 时间戳 + 无referrer
     function getCoverUrl(url) {
         if (!url) return '';
-        // 处理不同格式的图片URL
         if (url.startsWith('http://')) {
             url = url.replace('http://', 'https://');
         }
-        // 加时间戳防缓存
         return url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
     }
 
-    // 渲染歌曲列表（修复搜索封面）
+    // 渲染歌曲列表（修复封面分层问题）
     function renderSongList(list, container) {
         container.innerHTML = '';
         if (!list || list.length === 0) {
@@ -513,7 +514,6 @@
                     } catch (e) {}
                 };
             } else {
-                // 兼容所有可能的封面字段
                 cover = getCoverUrl(item.al?.picUrl || item.album?.picUrl || item.album?.blurPicUrl || "");
                 name = item.name || "";
                 artist = (item.ar || item.artists || []).map(a => a.name).join('/');
@@ -523,10 +523,10 @@
                 };
             }
 
+            // 修复封面分层：强制display:block，去掉多余节点
             card.innerHTML = `
                 <img class="song-cover" src="${cover}" alt="${name}" referrerpolicy="no-referrer" crossorigin="anonymous"
-                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                <div style="display:none;width:100%;aspect-ratio:1/1;background:#272e3b;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#94a3b8;">♪</div>
+                     onerror="this.style.display='none'; this.insertAdjacentHTML('afterend','<div style=\\'width:100%;aspect-ratio:1/1;background:#272e3b;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#94a3b8;\\'>♪</div>');">
                 <div class="song-name">${name}</div>
                 <div class="song-artist">${artist}</div>
             `;
@@ -593,7 +593,6 @@
         });
         if (activeLine) {
             activeLine.classList.add('active');
-            // 手机端歌词不需要滚动，桌面端才需要
             if (!activeLine.closest('.lyrics-box-mobile')) {
                 activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
