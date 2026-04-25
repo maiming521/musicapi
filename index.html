@@ -474,17 +474,22 @@
         return `${m.toString().padStart(2,0)}:${sec.toString().padStart(2,0)}`;
     }
 
-    // 统一获取封面URL（增强健壮性）
+    // 统一获取封面URL（健壮版）
     function getCoverUrl(item) {
         if (!item) return '';
-        // 优先查找多种可能的封面字段
-        let cover = item.picUrl || item.coverImgUrl || item.coverUrl || item.cover;
-        if (!cover && item.al) cover = item.al.picUrl;
-        if (!cover && item.album) cover = item.album.picUrl || item.album.blurPicUrl;
-        if (!cover && item.artists && item.artists[0] && item.artists[0].picUrl) cover = item.artists[0].picUrl;
+        // 尝试多种路径
+        let cover = '';
+        if (item.picUrl) cover = item.picUrl;
+        else if (item.coverImgUrl) cover = item.coverImgUrl;
+        else if (item.coverUrl) cover = item.coverUrl;
+        else if (item.cover) cover = item.cover;
+        else if (item.al && item.al.picUrl) cover = item.al.picUrl;
+        else if (item.album && item.album.picUrl) cover = item.album.picUrl;
+        else if (item.album && item.album.blurPicUrl) cover = item.album.blurPicUrl;
+        else if (item.artists && item.artists[0] && item.artists[0].picUrl) cover = item.artists[0].picUrl;
         if (!cover) return '';
         if (cover.startsWith('http://')) cover = cover.replace('http://', 'https://');
-        // 加上时间戳打破缓存
+        // 加时间戳防止缓存
         return cover + (cover.includes('?') ? '&' : '?') + '_t=' + Date.now();
     }
 
@@ -499,7 +504,7 @@
         }
     }
 
-    // 渲染歌曲列表（修复封面显示）
+    // 渲染歌曲列表（统一处理歌单和单曲）
     function renderSongList(list, container) {
         container.innerHTML = '';
         if (!list || list.length === 0) {
@@ -510,21 +515,17 @@
             const card = document.createElement('div');
             card.className = "song-card";
             
-            let cover = '';
-            let name = '';
+            let cover = getCoverUrl(item);
+            let name = item.name || '';
             let artist = '';
-            let isPlaylist = false;
-            if (item.type === 'playlist') {
-                cover = getCoverUrl(item);
-                name = item.name || '';
+            let isPlaylist = !!item.type && item.type === 'playlist';
+            if (isPlaylist) {
                 artist = '推荐歌单';
-                isPlaylist = true;
             } else {
-                cover = getCoverUrl(item);
-                name = item.name || '';
                 artist = (item.ar || item.artists || []).map(a => a.name).join('/');
             }
 
+            // 注意：这里onerror处理需要确保图片加载失败时显示占位符
             card.innerHTML = `
                 <img class="song-cover" src="${cover}" alt="${name}" referrerpolicy="no-referrer" crossorigin="anonymous"
                      onerror="this.style.display='none'; this.insertAdjacentHTML('afterend','<div style=\\'width:100%;aspect-ratio:1/1;background:#272e3b;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#94a3b8;\\'>♪</div>');">
@@ -566,7 +567,7 @@
         return list;
     }
 
-    // 加载并渲染歌词
+    // 加载歌词
     async function loadLyric(id) {
         lyricList = [];
         lyricsContent.innerHTML = '';
@@ -581,7 +582,6 @@
                 el.dataset.time = line.time;
                 el.textContent = line.text;
                 lyricsContent.appendChild(el);
-                // 手机端
                 const elMobile = document.createElement('div');
                 elMobile.className = 'lyric-line';
                 elMobile.dataset.time = line.time;
@@ -613,7 +613,7 @@
         }
     }
 
-    // 播放歌曲（修复封面显示）
+    // 播放歌曲
     async function playSong(song) {
         if (!song?.id) return;
         currentSong = song;
@@ -701,7 +701,7 @@
         playSong(currentSongList[idx]);
     };
 
-    // 收藏功能（简单示例）
+    // 收藏
     document.getElementById('favBtn').onclick = () => {
         if (!currentSong) return;
         const idx = favorites.findIndex(f => f.id === currentSong.id);
@@ -715,7 +715,7 @@
         localStorage.setItem('favorites', JSON.stringify(favorites));
     };
 
-    // 模式切换（简单循环）
+    // 模式切换
     let modeIdx = 0;
     const modes = ['order', 'random'];
     document.getElementById('modeBtn').onclick = () => {
