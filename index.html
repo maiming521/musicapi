@@ -2,7 +2,8 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 关键：添加移动端视口配置，实现自适应 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>云音·乐</title>
     <style>
         * {
@@ -16,13 +17,28 @@
             color: #fff;
             min-height: 100vh;
             padding: 2rem 8rem;
+            /* 移动端基础适配 */
+            @media (max-width: 1024px) {
+                padding: 1.5rem 2rem;
+            }
+            @media (max-width: 600px) {
+                padding: 1rem;
+            }
         }
         header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 3rem;
+            gap: 2rem;
+            /* 移动端header自适应 */
+            @media (max-width: 1024px) {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1.5rem;
+            }
         }
+        /* Logo 加上链接样式 */
         .logo {
             display: flex;
             align-items: center;
@@ -30,19 +46,30 @@
             font-size: 2.5rem;
             font-weight: bold;
             color: #a8d1ff;
+            text-decoration: none;
+            cursor: pointer;
+            @media (max-width: 600px) {
+                font-size: 2rem;
+            }
         }
         .logo svg {
             width: 3rem;
             height: 3rem;
             fill: #a8d1ff;
+            @media (max-width: 600px) {
+                width: 2rem;
+                height: 2rem;
+            }
         }
         .search-box {
             display: flex;
             align-items: center;
             gap: 0;
+            width: 100%;
+            max-width: 40rem;
         }
         .search-box input {
-            width: 30rem;
+            flex: 1;
             padding: 1rem 1.5rem;
             border: none;
             border-radius: 2rem 0 0 2rem;
@@ -50,6 +77,10 @@
             color: #fff;
             font-size: 1.2rem;
             outline: none;
+            @media (max-width: 600px) {
+                padding: 0.8rem 1rem;
+                font-size: 1rem;
+            }
         }
         .search-box button {
             padding: 1rem 2rem;
@@ -60,6 +91,10 @@
             font-size: 1.2rem;
             cursor: pointer;
             transition: background-color 0.3s;
+            @media (max-width: 600px) {
+                padding: 0.8rem 1.2rem;
+                font-size: 1rem;
+            }
         }
         .search-box button:hover {
             background-color: #2563eb;
@@ -74,6 +109,9 @@
             margin-bottom: 1.5rem;
             font-size: 2rem;
             font-weight: bold;
+            @media (max-width: 600px) {
+                font-size: 1.5rem;
+            }
         }
         .refresh-btn {
             font-size: 1.2rem;
@@ -88,6 +126,14 @@
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             gap: 1.5rem;
+            /* 移动端歌单自适应 */
+            @media (max-width: 1024px) {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+            @media (max-width: 600px) {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+                gap: 1rem;
+            }
         }
         .song-card {
             background-color: #1a1f29;
@@ -95,6 +141,9 @@
             padding: 1rem;
             cursor: pointer;
             transition: all 0.3s;
+            @media (max-width: 600px) {
+                padding: 0.8rem;
+            }
         }
         .song-cover {
             width: 100%;
@@ -102,6 +151,8 @@
             border-radius: 8px;
             object-fit: cover;
             margin-bottom: 0.8rem;
+            /* 修复裂图问题：默认背景色 */
+            background-color: #272e3b;
         }
         .song-name {
             font-size: 1rem;
@@ -110,6 +161,9 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            @media (max-width: 600px) {
+                font-size: 0.9rem;
+            }
         }
         .song-artist {
             font-size: 0.85rem;
@@ -117,6 +171,9 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            @media (max-width: 600px) {
+                font-size: 0.75rem;
+            }
         }
         .player-bar {
             position: fixed;
@@ -129,23 +186,56 @@
             align-items: center;
             gap: 2rem;
             border-top: 1px solid #272e3b;
+            /* 播放器自适应 */
+            @media (max-width: 1024px) {
+                padding: 1rem 2rem;
+                gap: 1rem;
+            }
+            @media (max-width: 600px) {
+                padding: 0.8rem 1rem;
+                flex-wrap: wrap;
+                gap: 0.8rem;
+            }
         }
         .player-info {
             display: flex;
             align-items: center;
             gap: 1rem;
             width: 20%;
+            @media (max-width: 1024px) {
+                width: 30%;
+            }
+            @media (max-width: 600px) {
+                width: 100%;
+                order: 1;
+            }
         }
+        /* 修复无歌曲播放时的裂图 */
         .player-cover {
             width: 60px;
             height: 60px;
             border-radius: 8px;
             object-fit: cover;
+            /* 默认占位样式 */
+            background-color: #272e3b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+            font-size: 0.8rem;
+        }
+        .player-cover[src=""] {
+            content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/%3E%3C/svg%3E");
         }
         .player-controls {
             display: flex;
             align-items: center;
             gap: 1.5rem;
+            @media (max-width: 600px) {
+                gap: 1rem;
+                order: 2;
+                margin: 0 auto;
+            }
         }
         .control-btn {
             background: none;
@@ -154,18 +244,28 @@
             font-size: 1.5rem;
             cursor: pointer;
             transition: color 0.3s;
+            @media (max-width: 600px) {
+                font-size: 1.2rem;
+            }
         }
         .control-btn:hover {
             color: #3b82f6;
         }
         .play-btn {
             font-size: 2rem;
+            @media (max-width: 600px) {
+                font-size: 1.5rem;
+            }
         }
         .progress-bar {
             flex: 1;
             display: flex;
             align-items: center;
             gap: 1rem;
+            @media (max-width: 600px) {
+                order: 3;
+                width: 100%;
+            }
         }
         .progress-bar input[type="range"] {
             flex: 1;
@@ -187,6 +287,9 @@
             display: flex;
             align-items: center;
             gap: 0.8rem;
+            @media (max-width: 600px) {
+                display: none;
+            }
         }
         .volume-bar input[type="range"] {
             width: 100px;
@@ -215,6 +318,10 @@
             padding: 1.5rem;
             overflow-y: auto;
             border: 1px solid #272e3b;
+            /* 移动端隐藏歌词框 */
+            @media (max-width: 1024px) {
+                display: none;
+            }
         }
         .lyrics-title {
             font-size: 1.2rem;
@@ -239,16 +346,24 @@
             cursor: pointer;
             margin-left: 1rem;
         }
+        /* 给底部留出播放器高度，防止内容被遮挡 */
+        body {
+            padding-bottom: 120px;
+            @media (max-width: 600px) {
+                padding-bottom: 180px;
+            }
+        }
     </style>
 </head>
 <body>
     <header>
-        <div class="logo">
+        <!-- Logo 加上自定义链接，修改href即可 -->
+        <a href="/" class="logo">
             <svg viewBox="0 0 24 24">
                 <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
             </svg>
             云音·乐
-        </div>
+        </a>
         <div class="search-box">
             <input type="text" id="searchInput" placeholder="搜索歌曲、歌手...">
             <button id="searchBtn">搜索</button>
@@ -275,6 +390,7 @@
 
     <div class="player-bar">
         <div class="player-info">
+            <!-- 默认src为空，用CSS修复裂图 -->
             <img class="player-cover" id="playerCover" src="" alt="">
             <div>
                 <div id="playerName">未播放歌曲</div>
@@ -303,7 +419,7 @@
 
     <script>
         // ========== 配置项（改成你的API地址） ==========
-        const API_BASE = 'https://api1.567.one';
+        const API_BASE = 'https://api.567.one';
         let currentSong = null;
         let currentSongList = [];
         let playMode = 'order'; // order/loop/random
@@ -422,7 +538,11 @@
         // 播放歌曲
         async function playSong(song) {
             currentSong = song;
+            // 修复封面：给src赋值，同时处理加载失败
             playerCover.src = song.al.picUrl;
+            playerCover.onerror = function() {
+                this.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/%3E%3C/svg%3E";
+            }
             playerName.textContent = song.name;
             playerArtist.textContent = song.ar.map(a => a.name).join('/');
             updateFavBtn();
@@ -508,15 +628,17 @@
         // 渲染歌曲列表
         function renderSongList(list, container) {
             container.innerHTML = '';
-            if (!list.length) {
+            if (!list?.length) {
                 container.innerHTML = '未找到相关歌曲';
                 return;
             }
             list.forEach(song => {
                 const card = document.createElement('div');
                 card.className = 'song-card';
+                // 修复裂图：给封面加onerror处理
                 card.innerHTML = `
-                    <img class="song-cover" src="${song.al.picUrl}" alt="${song.name}">
+                    <img class="song-cover" src="${song.al.picUrl}" alt="${song.name}" 
+                         onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%2394a3b8%22%3E%3Cpath d=%22M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z%22/%3E%3C/svg%3E'">
                     <div class="song-name">${song.name}</div>
                     <div class="song-artist">${song.ar.map(a => a.name).join('/')}</div>
                 `;
@@ -530,21 +652,36 @@
 
         // 获取热门推荐
         async function renderRecommend() {
-            const res = await fetch(`${API_BASE}/top/playlist/highquality?cat=华语&limit=10`);
-            const data = await res.json();
-            if (data.playlists?.length) {
-                const playlistId = data.playlists[0].id;
-                const songRes = await fetch(`${API_BASE}/playlist/detail?id=${playlistId}`);
-                const songData = await songRes.json();
-                renderSongList(songData.playlist?.tracks || [], recommendList);
+            recommendList.innerHTML = '加载中...';
+            try {
+                const res = await fetch(`${API_BASE}/top/playlist/highquality?cat=华语&limit=10`);
+                const data = await res.json();
+                if (data.playlists?.length) {
+                    const playlistId = data.playlists[0].id;
+                    const songRes = await fetch(`${API_BASE}/playlist/detail?id=${playlistId}`);
+                    const songData = await songRes.json();
+                    renderSongList(songData.playlist?.tracks || [], recommendList);
+                } else {
+                    recommendList.innerHTML = '加载失败';
+                }
+            } catch (e) {
+                recommendList.innerHTML = '加载失败，请检查API';
             }
         }
 
-        // 搜索歌曲
+        // 修复搜索逻辑：正确解析API返回的歌曲列表
         async function searchSongs(keywords) {
-            const res = await fetch(`${API_BASE}/search?keywords=${keywords}`);
-            const data = await res.json();
-            renderSongList(data.result?.songs || [], searchResult);
+            if (!keywords.trim()) return;
+            searchResult.innerHTML = '搜索中...';
+            try {
+                const res = await fetch(`${API_BASE}/search?keywords=${encodeURIComponent(keywords)}`);
+                const data = await res.json();
+                // 适配不同版本的API返回格式
+                const songs = data.result?.songs || data.songs || [];
+                renderSongList(songs, searchResult);
+            } catch (e) {
+                searchResult.innerHTML = '搜索失败，请检查API';
+            }
         }
 
         // 事件绑定
