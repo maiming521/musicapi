@@ -439,10 +439,10 @@
     </div>
 </div>
 
-<audio id="audio">
+<audio id="audio"></audio>
 
 <script>
-    const API_BASE = 'https://api1.567.one';
+    const API_BASE = 'https://api1.567.one';  // 请确保该域名支持跨域且接口正常
 
     let currentSong = null;
     let currentSongList = [];
@@ -474,16 +474,32 @@
         return `${m.toString().padStart(2,0)}:${sec.toString().padStart(2,0)}`;
     }
 
-    // 封面加载方案：兼容所有字段 + 时间戳 + 无referrer
-    function getCoverUrl(url) {
-        if (!url) return '';
-        if (url.startsWith('http://')) {
-            url = url.replace('http://', 'https://');
-        }
-        return url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+    // 统一获取封面URL（增强健壮性）
+    function getCoverUrl(item) {
+        if (!item) return '';
+        // 优先查找多种可能的封面字段
+        let cover = item.picUrl || item.coverImgUrl || item.coverUrl || item.cover;
+        if (!cover && item.al) cover = item.al.picUrl;
+        if (!cover && item.album) cover = item.album.picUrl || item.album.blurPicUrl;
+        if (!cover && item.artists && item.artists[0] && item.artists[0].picUrl) cover = item.artists[0].picUrl;
+        if (!cover) return '';
+        if (cover.startsWith('http://')) cover = cover.replace('http://', 'https://');
+        // 加上时间戳打破缓存
+        return cover + (cover.includes('?') ? '&' : '?') + '_t=' + Date.now();
     }
 
-    // 渲染歌曲列表（修复封面分层问题）
+    // 获取歌曲播放URL
+    async function getSongUrl(songId) {
+        try {
+            const res = await fetch(`${API_BASE}/song/url?id=${songId}&br=320000&_t=${Date.now()}`);
+            const data = await res.json();
+            return data.data?.[0]?.url || '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    // 渲染歌曲列表（修复封面显示）
     function renderSongList(list, container) {
         container.innerHTML = '';
         if (!list || list.length === 0) {
@@ -494,16 +510,30 @@
             const card = document.createElement('div');
             card.className = "song-card";
             
-            let cover, name, artist;
+            let cover = '';
+            let name = '';
+            let artist = '';
+            let isPlaylist = false;
             if (item.type === 'playlist') {
-                cover = getCoverUrl(item.picUrl || item.coverImgUrl || "");
-                name = item.name || "";
-                artist = "推荐歌单";
-                card.onclick = async () => {
+                cover = getCoverUrl(item);
+                name = item.name || '';
+                artist = '推荐歌单';
+                isPlaylist = true;
+            } else {
+                cover = getCoverUrl(item);
+                name = item.name || '';
+                artist = (item.ar || item.artists || []).map(a => a.name).join('/');
+            }
+
+            card.innerHTML = `
+                <img class="song-cover" src="${cover}" alt="${name}" referrerpolicy="no-referrer" crossorigin="anonymous"
+                     onerror="this.style.display='none'; this.insertAdjacentHTML('afterend','<div style=\\'width:100%;aspect-ratio:1/1;background:#272e3b;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#94a3b8;\\'>♪</div>');">
+                <div class="song-name">${name}</div>
+                <div class="song-artist">${artist}</div>
+            `;
+            card.onclick = async () => {
+                if (isPlaylist) {
                     try {
-                        currentSongList = [];
-                        currentSong = null;
-                        audio.src = '';
                         const res = await fetch(`${API_BASE}/playlist/detail?id=${item.id}&_t=${Date.now()}`);
                         const data = await res.json();
                         const songs = data.playlist?.tracks || [];
@@ -512,29 +542,16 @@
                             await playSong(songs[0]);
                         }
                     } catch (e) {}
-                };
-            } else {
-                cover = getCoverUrl(item.al?.picUrl || item.album?.picUrl || item.album?.blurPicUrl || "");
-                name = item.name || "";
-                artist = (item.ar || item.artists || []).map(a => a.name).join('/');
-                card.onclick = () => {
+                } else {
                     currentSongList = list;
-                    playSong(item);
-                };
-            }
-
-            // 修复封面分层：强制display:block，去掉多余节点
-            card.innerHTML = `
-                <img class="song-cover" src="${cover}" alt="${name}" referrerpolicy="no-referrer" crossorigin="anonymous"
-                     onerror="this.style.display='none'; this.insertAdjacentHTML('afterend','<div style=\\'width:100%;aspect-ratio:1/1;background:#272e3b;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#94a3b8;\\'>♪</div>');">
-                <div class="song-name">${name}</div>
-                <div class="song-artist">${artist}</div>
-            `;
+                    await playSong(item);
+                }
+            };
             container.appendChild(card);
         });
     }
 
-    // 解析歌词为时间戳+文本
+    // 解析歌词
     function parseLyric(lrcStr) {
         if (!lrcStr) return [];
         const lines = lrcStr.split('\n');
@@ -558,21 +575,18 @@
             const res = await fetch(`${API_BASE}/lyric?id=${id}&_t=${Date.now()}`);
             const data = await res.json();
             lyricList = parseLyric(data.lrc?.lyric || '');
-            // 桌面端渲染
             lyricList.forEach(line => {
                 const el = document.createElement('div');
                 el.className = 'lyric-line';
                 el.dataset.time = line.time;
                 el.textContent = line.text;
                 lyricsContent.appendChild(el);
-            });
-            // 手机端渲染
-            lyricList.forEach(line => {
-                const el = document.createElement('div');
-                el.className = 'lyric-line';
-                el.dataset.time = line.time;
-                el.textContent = line.text;
-                lyricsContentMobile.appendChild(el);
+                // 手机端
+                const elMobile = document.createElement('div');
+                elMobile.className = 'lyric-line';
+                elMobile.dataset.time = line.time;
+                elMobile.textContent = line.text;
+                lyricsContentMobile.appendChild(elMobile);
             });
         } catch (e) {
             lyricsContent.innerHTML = '<div class="lyric-line">[00:00.00]暂无歌词</div>';
@@ -580,7 +594,7 @@
         }
     }
 
-    // 歌词实时高亮
+    // 歌词高亮
     function highlightLyric(currentTime) {
         const lines = document.querySelectorAll('.lyric-line');
         let activeLine = null;
@@ -599,29 +613,25 @@
         }
     }
 
-    // 播放歌曲
+    // 播放歌曲（修复封面显示）
     async function playSong(song) {
         if (!song?.id) return;
         currentSong = song;
         audio.pause();
         audio.src = '';
-
-        const cover = getCoverUrl(song.al?.picUrl || song.album?.picUrl || "");
+        
+        const cover = getCoverUrl(song);
         playerCover.src = cover;
-        playerName.textContent = song.name || "";
+        playerName.textContent = song.name || '';
         playerArtist.textContent = (song.ar || song.artists || []).map(a => a.name).join('/');
         playBtn.textContent = "▶";
 
-        try {
-            const res = await fetch(`${API_BASE}/song/url?id=${song.id}&br=320000&_t=${Date.now()}`);
-            const data = await res.json();
-            if (data.data?.[0]?.url) {
-                audio.src = data.data[0].url;
-                await audio.play();
-                playBtn.textContent = "⏸";
-            }
-        } catch (e) {}
-
+        const url = await getSongUrl(song.id);
+        if (url) {
+            audio.src = url;
+            await audio.play();
+            playBtn.textContent = "⏸";
+        }
         loadLyric(song.id);
     }
 
@@ -632,7 +642,8 @@
         try {
             const res = await fetch(`${API_BASE}/search?keywords=${encodeURIComponent(key)}&type=1&_t=${Date.now()}`);
             const data = await res.json();
-            renderSongList(data.result?.songs || [], searchResult);
+            const songs = data.result?.songs || [];
+            renderSongList(songs, searchResult);
         } catch (e) {
             searchResult.innerHTML = "搜索失败";
         }
@@ -645,7 +656,7 @@
             const res = await fetch(`${API_BASE}/personalized?limit=12&_t=${Date.now()}`);
             const data = await res.json();
             const list = data.result || [];
-            list.forEach(i => i.type = 'playlist');
+            list.forEach(i => { i.type = 'playlist'; });
             renderSongList(list, recommendList);
         } catch (e) {
             recommendList.innerHTML = "加载失败";
@@ -658,7 +669,6 @@
         else { audio.pause(); playBtn.textContent = "▶"; }
     };
 
-    // 时间更新时，高亮歌词
     audio.ontimeupdate = () => {
         progressSlider.value = (audio.currentTime / audio.duration) * 100 || 0;
         currentTimeEl.textContent = formatTime(audio.currentTime);
@@ -689,6 +699,29 @@
         let idx = currentSongList.findIndex(s => s.id === currentSong.id);
         idx = idx >= currentSongList.length - 1 ? 0 : idx + 1;
         playSong(currentSongList[idx]);
+    };
+
+    // 收藏功能（简单示例）
+    document.getElementById('favBtn').onclick = () => {
+        if (!currentSong) return;
+        const idx = favorites.findIndex(f => f.id === currentSong.id);
+        if (idx > -1) {
+            favorites.splice(idx, 1);
+            document.getElementById('favBtn').textContent = '♡';
+        } else {
+            favorites.push({ id: currentSong.id, name: currentSong.name, artist: playerArtist.textContent });
+            document.getElementById('favBtn').textContent = '❤️';
+        }
+        localStorage.setItem('favorites', JSON.stringify(favorites));
+    };
+
+    // 模式切换（简单循环）
+    let modeIdx = 0;
+    const modes = ['order', 'random'];
+    document.getElementById('modeBtn').onclick = () => {
+        modeIdx = (modeIdx + 1) % modes.length;
+        playMode = modes[modeIdx];
+        document.getElementById('modeBtn').textContent = playMode === 'order' ? '🔁' : '🔀';
     };
 
     // 事件绑定
